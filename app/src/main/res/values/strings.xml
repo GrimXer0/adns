@@ -270,6 +270,14 @@
     <string name="privileged_dns_control_description">Grant ADNS permission to switch and observe Android Private DNS.</string>
     <string name="shizuku_unavailable">Shizuku is not running. Start Shizuku and try again.</string>
     <string name="shizuku_permission_denied">Shizuku permission was denied.</string>
+    <string name="shevery">Shevery</string>
+    <string name="shevery_or_shizuku">Shevery / Shizuku</string>
+    <string name="requires_shevery_shizuku_or_sui_installed_and_set_up">Requires Shevery, Shizuku, or Sui installed and set up.</string>
+    <string name="shevery_unavailable">Shevery is not running. Start Shevery and try again.</string>
+    <string name="shevery_permission_denied">Shevery permission was denied.</string>
+    <string name="shevery_or_shizuku_unavailable">Shevery or Shizuku is not running. Start Shevery or Shizuku and try again.</string>
+    <string name="shevery_or_shizuku_permission_denied">Privileged API permission was denied.</string>
+    <string name="privileged_server_untrusted">Unable to verify the privileged service identity.</string>
     <string name="quad9">Quad9</string>
     <string name="the_public_quad9_dns_server">The public Quad9 DNS server.</string>
     <string name="secured">Secured</string>

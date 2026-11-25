@@ -27,5 +27,10 @@
 -keep class com.eyalm.adns.domain.AppDestination { *; }
 -keep class com.eyalm.adns.domain.MainTab { *; }
 
+-keep class com.hamondev.shevery.** { *; }
+-keep interface com.hamondev.shevery.** { *; }
 -keep class rikka.shizuku.** { *; }
 -keep interface rikka.shizuku.** { *; }
+-keep class rikka.sui.** { *; }
+-keep class moe.shizuku.** { *; }
+-keep interface moe.shizuku.** { *; }

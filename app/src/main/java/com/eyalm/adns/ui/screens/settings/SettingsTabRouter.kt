@@ -61,6 +61,7 @@ fun SettingsTabRouter(
     }.state.collectAsState()
     val permissionViewModel: OnboardingViewModel = viewModel()
     val permissionAcquisitionState by permissionViewModel.permissionState.collectAsState()
+    val detectedPrivilegedBackend by permissionViewModel.detectedPrivilegedBackend.collectAsState()
 
     val mainListState = rememberLazyListState()
 
@@ -141,6 +142,7 @@ fun SettingsTabRouter(
                 ActivationScreen(
                     state = activationState,
                     permissionAcquisitionState = permissionAcquisitionState,
+                    detectedPrivilegedBackend = detectedPrivilegedBackend,
                     controlOnlyEligible = capabilities.canManageNextDns,
                     exitPolicy = ActivationExitPolicy.Allowed,
                     onStartPermissionMonitoring =

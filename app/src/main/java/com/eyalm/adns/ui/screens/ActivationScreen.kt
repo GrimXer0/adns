@@ -40,6 +40,7 @@ import com.eyalm.adns.R
 import com.eyalm.adns.data.activation.ActivationMode
 import com.eyalm.adns.data.activation.ActivationState
 import com.eyalm.adns.data.activation.PermissionState
+import com.eyalm.adns.data.activation.PrivilegedApiBackend
 import com.eyalm.adns.ui.components.ExpressiveIcon
 import com.eyalm.adns.ui.components.ResourceSettingRow
 import com.eyalm.adns.ui.components.SegmentPosition
@@ -134,6 +135,7 @@ fun shouldOfferControlOnlySwitch(
 fun ActivationScreen(
     state: ActivationState,
     permissionAcquisitionState: PermissionAcquisitionState,
+    detectedPrivilegedBackend: PrivilegedApiBackend? = null,
     controlOnlyEligible: Boolean,
     exitPolicy: ActivationExitPolicy,
     onStartPermissionMonitoring: () -> Unit,
@@ -206,6 +208,7 @@ fun ActivationScreen(
         )
 
         ActivationScreenPage.Method -> ActivationMethodScreen(
+            detectedBackend = detectedPrivilegedBackend,
             onBackClick = {
                 page = reduceActivationScreenPage(page, ActivationScreenIntent.Back)
             },
@@ -236,6 +239,7 @@ fun ActivationScreen(
 
         ActivationScreenPage.Shizuku -> ShizukuActivationScreen(
             state = permissionAcquisitionState,
+            detectedBackend = detectedPrivilegedBackend,
             onBack = {
                 page = reduceActivationScreenPage(page, ActivationScreenIntent.Back)
             },

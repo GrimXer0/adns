@@ -20,6 +20,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.eyalm.adns.data.activation.PrivilegedApiBackend
 import com.eyalm.adns.ui.components.RadioSettingRow
 import com.eyalm.adns.ui.components.SegmentPosition
 import com.eyalm.adns.ui.components.OnboardingTemplate
@@ -29,11 +30,17 @@ import com.eyalm.adns.ui.theme.pageTitle
 @Preview
 @Composable
 fun ActivationMethodScreen(
+    detectedBackend: PrivilegedApiBackend? = null,
     onBackClick: () -> Unit = {},
     onNextClick: (shizuku: Boolean, adb: Boolean) -> Unit = { _, _ -> }
 ) {
     var shizukuPressed by remember { mutableStateOf(false) }
     var adbPressed by remember { mutableStateOf(false) }
+    val privilegedTitleRes = when (detectedBackend) {
+        PrivilegedApiBackend.Shevery -> R.string.shevery
+        PrivilegedApiBackend.Shizuku -> R.string.shizuku
+        null -> R.string.shevery_or_shizuku
+    }
 
     OnboardingTemplate(
         onBackClick = onBackClick,
@@ -71,8 +78,8 @@ fun ActivationMethodScreen(
 
             item {
                 RadioSettingRow(
-                    title = stringResource(R.string.shizuku),
-                    description = stringResource(R.string.requires_shizuku_or_sui_installed_and_set_up),
+                    title = stringResource(privilegedTitleRes),
+                    description = stringResource(R.string.requires_shevery_shizuku_or_sui_installed_and_set_up),
                     selected = shizukuPressed,
                     onClick = {
                         shizukuPressed = !shizukuPressed

@@ -96,9 +96,9 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
-    val shizuku_version = "13.1.5"
-    implementation("dev.rikka.shizuku:api:${shizuku_version}")
-    implementation("dev.rikka.shizuku:provider:${shizuku_version}")
+    val shevery_version = "14.6.4"
+    implementation("com.hamondev.shevery.api:api:${shevery_version}")
+    implementation("com.hamondev.shevery.api:provider:${shevery_version}")
     implementation("androidx.compose.material3:material3:1.5.0-alpha16")
     implementation(libs.androidx.graphics.shapes)
     implementation("androidx.core:core-splashscreen:1.2.0")
