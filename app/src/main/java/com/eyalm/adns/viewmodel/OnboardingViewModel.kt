@@ -1,21 +1,16 @@
 package com.eyalm.adns.viewmodel
 
-import android.Manifest
 import android.app.Application
-import android.content.ComponentName
-import android.content.ServiceConnection
-import android.content.pm.PackageManager
-import android.os.IBinder
-import androidx.core.content.pm.PackageInfoCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.eyalm.adns.BuildConfig
-import com.eyalm.adns.IPrivilegedService
-import com.eyalm.adns.PrivilegedService
 import com.eyalm.adns.data.DnsRepository
 import com.eyalm.adns.data.activation.ActivationRepositories
+import com.eyalm.adns.data.activation.AndroidPrivilegedApiBridge
 import com.eyalm.adns.data.activation.PermissionState
+import com.eyalm.adns.data.activation.PrivilegedActivationCoordinator
+import com.eyalm.adns.data.activation.PrivilegedApiBackend
 import com.eyalm.adns.data.nextdns.api.NextDnsProfile
 import com.eyalm.adns.data.nextdns.profile.NextDnsProfileRepository
 import com.eyalm.adns.data.provider.DnsProviderCatalog
@@ -24,10 +19,10 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import rikka.shizuku.Shizuku
 
 sealed interface PermissionAcquisitionState {
     data object Idle : PermissionAcquisitionState
@@ -37,6 +32,7 @@ sealed interface PermissionAcquisitionState {
     data object Granted : PermissionAcquisitionState
     data object ShizukuUnavailable : PermissionAcquisitionState
     data object Denied : PermissionAcquisitionState
+    data object UntrustedServer : PermissionAcquisitionState
     data class Error(val message: String?) : PermissionAcquisitionState
 }
 
@@ -78,44 +74,31 @@ class OnboardingViewModel(
     val completion = _completion.asSharedFlow()
 
     private var permissionCheckJob: Job? = null
-    private var listenerRegistered = false
-    private var userServiceArgs: Shizuku.UserServiceArgs? = null
-    private var serviceBound = false
 
-    private val connection = object : ServiceConnection {
-        override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
-            serviceBound = true
-            _permissionState.value = PermissionAcquisitionState.Granting
-            val service = IPrivilegedService.Stub.asInterface(binder)
-            try {
-                service.grantWriteSecureSettings(getApplication<Application>().packageName)
-                unbindPrivilegedService()
-                startPermissionCheck()
-            } catch (error: Exception) {
-                _permissionState.value = PermissionAcquisitionState.Error(error.message)
-                unbindPrivilegedService()
-            }
-        }
+    private val privilegedCoordinator = PrivilegedActivationCoordinator(
+        bridge = AndroidPrivilegedApiBridge(application),
+        expectedApplicationId = BuildConfig.APPLICATION_ID,
+        scope = viewModelScope,
+        isWriteSecureSettingsGranted = {
+            activationRepository.refreshPermission()
+            activationRepository.state.value.permission == PermissionState.Granted
+        },
+        onWriteSecureSettingsGranted = {
+            flow.dispatch(OnboardingIntent.ActivationGranted)
+            persistState()
+        },
+        onStartPermissionPolling = ::startPermissionCheck,
+        onStateChanged = { newState ->
+            _permissionState.value = newState
+        },
+        currentState = { _permissionState.value },
+    )
 
-        override fun onServiceDisconnected(name: ComponentName?) {
-            serviceBound = false
-        }
-    }
-
-    private val permissionResultListener =
-        Shizuku.OnRequestPermissionResultListener { requestCode, grantResult ->
-            if (requestCode == SHIZUKU_PERMISSION_REQUEST) {
-                unregisterPermissionListener()
-                if (grantResult == PackageManager.PERMISSION_GRANTED) {
-                    bindPrivilegedService()
-                } else {
-                    _permissionState.value = PermissionAcquisitionState.Denied
-                }
-            }
-        }
+    val detectedPrivilegedBackend: StateFlow<PrivilegedApiBackend?> =
+        privilegedCoordinator.detectedBackend
 
     fun dispatch(intent: OnboardingIntent) {
-        if (intent == OnboardingIntent.Back) stopPermissionCheck()
+        if (intent == OnboardingIntent.Back) stopPermissionAcquisition()
         flow.dispatch(intent)
         persistState()
     }
@@ -151,35 +134,11 @@ class OnboardingViewModel(
 
     fun stopPermissionAcquisition() {
         stopPermissionCheck()
-        unregisterPermissionListener()
-        unbindPrivilegedService()
+        privilegedCoordinator.stop()
     }
 
     fun requestShizukuActivation() {
-        if (_permissionState.value == PermissionAcquisitionState.RequestingShizuku) return
-        if (!runCatching { Shizuku.pingBinder() }.getOrDefault(false)) {
-            _permissionState.value = PermissionAcquisitionState.ShizukuUnavailable
-            return
-        }
-        _permissionState.value = PermissionAcquisitionState.RequestingShizuku
-        val permission = runCatching { Shizuku.checkSelfPermission() }.getOrElse {
-            _permissionState.value = PermissionAcquisitionState.ShizukuUnavailable
-            return
-        }
-        when {
-            permission == PackageManager.PERMISSION_GRANTED -> bindPrivilegedService()
-            runCatching { Shizuku.shouldShowRequestPermissionRationale() }
-                .getOrDefault(false) -> _permissionState.value = PermissionAcquisitionState.Denied
-
-            else -> {
-                registerPermissionListener()
-                runCatching { Shizuku.requestPermission(SHIZUKU_PERMISSION_REQUEST) }
-                    .onFailure {
-                        unregisterPermissionListener()
-                        _permissionState.value = PermissionAcquisitionState.ShizukuUnavailable
-                    }
-            }
-        }
+        privilegedCoordinator.startActivation()
     }
 
     fun finish() {
@@ -209,48 +168,6 @@ class OnboardingViewModel(
         }
     }
 
-    private fun bindPrivilegedService() {
-        if (serviceBound) return
-        val context = getApplication<Application>()
-        val componentName = ComponentName(context.packageName, PrivilegedService::class.java.name)
-        val versionCode = runCatching {
-            PackageInfoCompat.getLongVersionCode(
-                context.packageManager.getPackageInfo(context.packageName, 0),
-            )
-                .coerceAtMost(Int.MAX_VALUE.toLong())
-                .toInt()
-        }.getOrDefault(1)
-        val args = Shizuku.UserServiceArgs(componentName)
-            .processNameSuffix("service")
-            .debuggable(BuildConfig.DEBUG)
-            .daemon(false)
-            .version(versionCode)
-        userServiceArgs = args
-        runCatching { Shizuku.bindUserService(args, connection) }
-            .onFailure {
-                _permissionState.value = PermissionAcquisitionState.ShizukuUnavailable
-            }
-    }
-
-    private fun unbindPrivilegedService() {
-        val args = userServiceArgs ?: return
-        runCatching { Shizuku.unbindUserService(args, connection, true) }
-        serviceBound = false
-        userServiceArgs = null
-    }
-
-    private fun registerPermissionListener() {
-        if (listenerRegistered) return
-        Shizuku.addRequestPermissionResultListener(permissionResultListener)
-        listenerRegistered = true
-    }
-
-    private fun unregisterPermissionListener() {
-        if (!listenerRegistered) return
-        Shizuku.removeRequestPermissionResultListener(permissionResultListener)
-        listenerRegistered = false
-    }
-
     private fun persistState() {
         OnboardingStateCodec.encode(state.value).forEach { (key, value) ->
             savedStateHandle[key] = value
@@ -269,7 +186,6 @@ class OnboardingViewModel(
     }
 
     companion object {
-        private const val SHIZUKU_PERMISSION_REQUEST = 1
         private const val PERMISSION_POLL_INTERVAL_MS = 1_000L
 
         private fun restoreState(handle: SavedStateHandle): OnboardingFlowState {

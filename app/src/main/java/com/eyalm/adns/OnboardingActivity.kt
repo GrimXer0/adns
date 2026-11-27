@@ -56,6 +56,7 @@ class OnboardingActivity : AppCompatActivity() {
             val providerLoginViewModel: ProviderLoginViewModel = viewModel()
             val onboardingState by onboardingViewModel.state.collectAsState()
             val permissionState by onboardingViewModel.permissionState.collectAsState()
+            val detectedPrivilegedBackend by onboardingViewModel.detectedPrivilegedBackend.collectAsState()
             val providerLoginState by providerLoginViewModel.flowState.collectAsState()
 
             LaunchedEffect(onboardingViewModel) {
@@ -200,6 +201,7 @@ class OnboardingActivity : AppCompatActivity() {
                             OnboardingStep.ActivationMethod -> {
                                 BackHandler(onBack = back)
                                 ActivationMethodScreen(
+                                    detectedBackend = detectedPrivilegedBackend,
                                     onBackClick = back,
                                     onNextClick = { shizuku, adb ->
                                         val method = when {
@@ -227,6 +229,7 @@ class OnboardingActivity : AppCompatActivity() {
                                 BackHandler(onBack = back)
                                 ShizukuActivationScreen(
                                     state = permissionState,
+                                    detectedBackend = detectedPrivilegedBackend,
                                     onBack = back,
                                     onStart = onboardingViewModel::requestShizukuActivation,
                                     onStop = onboardingViewModel::stopPermissionAcquisition,

@@ -145,6 +145,8 @@ class MainActivity : AppCompatActivity() {
                 val permissionViewModel: OnboardingViewModel = viewModel()
                 val permissionAcquisitionState by
                     permissionViewModel.permissionState.collectAsState()
+                val detectedPrivilegedBackend by
+                    permissionViewModel.detectedPrivilegedBackend.collectAsState()
                 var activationVisible by rememberSaveable {
                     mutableStateOf(
                         capabilities.startupDestination == AppDestination.Activation
@@ -168,6 +170,7 @@ class MainActivity : AppCompatActivity() {
                         ActivationScreen(
                             state = activationState,
                             permissionAcquisitionState = permissionAcquisitionState,
+                            detectedPrivilegedBackend = detectedPrivilegedBackend,
                             controlOnlyEligible = capabilities.canManageNextDns,
                             exitPolicy = forcedActivationExitPolicy(
                                 controlOnlyEligible = capabilities.canManageNextDns,
